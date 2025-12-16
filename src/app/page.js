@@ -1,3 +1,4 @@
+import { Roboto_Flex } from 'next/font/google';
 import Link from 'next/link';
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
             <Link href="/services">Services</Link>
             <Link href="/about">About</Link>
             <Link href="/contact">Contact</Link>
+            <Link href="/submissions">Submissions</Link>
             <Link href="/submit" className="btn btn-primary" style={{margin: 0}}>Submit</Link>
           </div>
         </div>
@@ -58,6 +60,13 @@ export default function Home() {
         <div className="container">
           <p>&copy; 2024 LanceHub. All rights reserved.</p>
           <p>Professional Writing Services</p>
+        </div>
+        <div className="footer-links">
+          <Link href="/">Home</Link>
+          <Link href="/services">Services</Link>
+          <Link href="/about">About</Link>
+          <Link href="/contact">Contact</Link>
+          <Link href="/submissions">submissions</Link>
         </div>
       </footer>
     </div>

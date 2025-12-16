@@ -192,6 +192,18 @@ footer {
 footer p {
   margin: 0.5rem 0;
 }
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+footer a {
+  color: white;
+  cursor: pointer;
+}
+footer a:hover {
+  color: blue;
+}
 
 /* Forms */
 input, textarea, select {
