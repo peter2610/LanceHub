@@ -1,11 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Enable the App Router
-  experimental: {
-    appDir: true,
+  swcMinify: true,
+  images: {
+    domains: [],
   },
-  // Optional: Add any other Next.js configuration options here
+  // Add any other Next.js configuration options here
 }
 
 module.exports = nextConfig
