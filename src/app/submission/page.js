@@ -420,43 +420,6 @@ export default function Submission() {
                       </div>
 
                       <div className="cta-row">
-                        {canPay && (
-                          <div className="payment-stack">
-                            <div className="payment-select-wrapper">
-                              <label htmlFor={`quick-select-${assignment.id}`}>
-                                Select payment method
-                              </label>
-                              <div className="select-wrapper">
-                                <span className="select-icon">
-                                  {PAYMENT_METHOD_ICON[currentMethod] ?? "💼"}
-                                </span>
-                                <select
-                                  id={`quick-select-${assignment.id}`}
-                                  value={currentMethod}
-                                  onChange={(event) =>
-                                    handlePaymentMethodChange(
-                                      assignment.id,
-                                      event.target.value
-                                    )
-                                  }
-                                >
-                                  {PAYMENT_OPTIONS.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                      {option.label}
-                                      {!option.enabled ? " — contact support" : ""}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-
-                            {currentMethod && (
-                              <div className="payment-notice">
-                                <p className="notice-text">Payment processing will be available once the assignment is ready for payment.</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
 
                         {canDownload ? (
                           <div className="download-stack ready">
