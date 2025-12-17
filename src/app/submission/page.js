@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { PayPalButtons } from "@paypal/react-paypal-js";
 
@@ -9,45 +9,72 @@ const STATUS_META = {
     label: "Pending",
     textColor: "#2F2F45",
     pill: "rgba(47,47,69,0.1)",
-    message: "Your assignment is in queue. A writer will pick it shortly.",
+    message: "In queue. Writer will pick it shortly.",
   },
   ON_PROGRESS: {
     label: "In Progress",
     textColor: "#0E79FF",
     pill: "rgba(14,121,255,0.15)",
-    message: "Your assignment is currently being worked on.",
+    message: "Writer is working on your assignment.",
   },
   DONE: {
     label: "Ready for Payment",
     textColor: "#FF922B",
     pill: "rgba(255,146,43,0.18)",
-    message: "Your assignment is ready. Please complete payment to unlock downloads.",
+    message: "Complete. Pay to unlock downloads.",
   },
   PAYMENT_PENDING: {
     label: "Payment Pending",
-    textColor: "#6B6B7A",
-    pill: "rgba(107,107,122,0.15)",
-    message: "Payment received. Waiting for finance approval.",
+    textColor: "#7D3BFF",
+    pill: "rgba(125,59,255,0.15)",
+    message: "Payment received. Finance review in progress.",
   },
   PAID: {
     label: "Payment Approved",
     textColor: "#1F8A70",
     pill: "rgba(31,138,112,0.16)",
-    message: "Payment approved. Final checks before download unlock.",
+    message: "Payment approved. Final checks in progress.",
   },
   READY: {
     label: "Ready for Download",
     textColor: "#0EAD69",
     pill: "rgba(14,173,105,0.18)",
-    message: "Assignment ready for download. Proofs available below.",
+    message: "Downloads unlocked. Proofs available.",
   },
 };
 
 const PAYMENT_METHOD_ICON = {
   paypal: "🅿️",
   card: "💳",
+  bank: "🏦",
   mpesa: "📱",
 };
+
+const PAYMENT_OPTIONS = [
+  { id: "paypal", label: "PayPal", enabled: true },
+  { id: "card", label: "Card", enabled: false },
+  { id: "bank", label: "Bank", enabled: false },
+  { id: "mpesa", label: "M-Pesa", enabled: false },
+];
+
+const STEP_FLOW = [
+  { id: "submit", label: "Submit" },
+  { id: "track", label: "Track" },
+  { id: "pay", label: "Pay" },
+  { id: "download", label: "Download" },
+  { id: "proof", label: "Proof" },
+];
+
+const FILTER_OPTIONS = [
+  { id: "ALL", label: "All" },
+  { id: "ACTION", label: "Needs Action" },
+  { id: "IN_PROGRESS", label: "In Progress" },
+  { id: "COMPLETED", label: "Completed" },
+];
+
+const ACTION_STATUSES = ["DONE", "PAYMENT_PENDING"];
+const IN_PROGRESS_STATUSES = ["CREATED", "ON_PROGRESS"];
+const COMPLETED_STATUSES = ["PAID", "READY"];
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
@@ -56,8 +83,11 @@ const formatCurrency = (value) =>
 
 export default function Submission() {
   const [searchId, setSearchId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [paymentNotice, setPaymentNotice] = useState(null);
   const [paypalLoadingId, setPaypalLoadingId] = useState(null);
+  const [selectedMethods, setSelectedMethods] = useState({});
+  const [toast, setToast] = useState(null);
 
   const initialAssignments = useMemo(
     () => [
@@ -123,11 +153,46 @@ export default function Submission() {
 
   const [assignments, setAssignments] = useState(initialAssignments);
 
-  const filteredAssignments = assignments.filter((assignment) =>
+  const actionableAssignments = assignments.filter((assignment) =>
+    ACTION_STATUSES.includes(assignment.status)
+  );
+  const nextActionAssignment = actionableAssignments[0];
+  const totalActionDue = actionableAssignments.reduce(
+    (sum, assignment) => sum + assignment.amount,
+    0
+  );
+
+  const currentStepId = actionableAssignments.length
+    ? "pay"
+    : assignments.some((assignment) => assignment.status === "READY")
+    ? "download"
+    : assignments.some((assignment) =>
+        ["ON_PROGRESS", "CREATED"].includes(assignment.status)
+      )
+    ? "track"
+    : "submit";
+  const currentStepIndex = STEP_FLOW.findIndex(
+    (step) => step.id === currentStepId
+  );
+
+  const statusFilteredAssignments = assignments.filter((assignment) => {
+    if (statusFilter === "ACTION") {
+      return ACTION_STATUSES.includes(assignment.status);
+    }
+    if (statusFilter === "IN_PROGRESS") {
+      return IN_PROGRESS_STATUSES.includes(assignment.status);
+    }
+    if (statusFilter === "COMPLETED") {
+      return COMPLETED_STATUSES.includes(assignment.status);
+    }
+    return true;
+  });
+
+  const filteredAssignments = statusFilteredAssignments.filter((assignment) =>
     assignment.id.toLowerCase().includes(searchId.toLowerCase())
   );
 
-  const exactMatch = assignments.find(
+  const exactMatch = statusFilteredAssignments.find(
     (assignment) =>
       searchId &&
       assignment.id.toLowerCase() === searchId.trim().toLowerCase()
@@ -136,6 +201,13 @@ export default function Submission() {
   const payPalClientConfigured = Boolean(
     process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
   );
+
+  const handleScrollToAssignment = useCallback((assignmentId) => {
+    const el = document.getElementById(`assignment-${assignmentId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
 
   const handlePaymentSuccess = (orderId, assignmentId) => {
     setAssignments((prev) =>
@@ -165,17 +237,49 @@ export default function Submission() {
     alert(`${type} download unlocked for ${assignmentId} (mock action).`);
   };
 
+  const handlePaymentMethodChange = (assignmentId, methodId) => {
+    setSelectedMethods((prev) => ({ ...prev, [assignmentId]: methodId }));
+    if (methodId !== "paypal") {
+      setToast({
+        type: "warning",
+        text: `Only PayPal is available for online checkout. Please choose PayPal or contact support to use ${methodId.toUpperCase()}.`,
+      });
+      setTimeout(() => setToast(null), 4000);
+    }
+  };
+
   return (
     <div className="submission-shell">
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          <p>{toast.text}</p>
+        </div>
+      )}
       {/* HERO */}
       <section className="hero-section submission-hero">
         <div className="container">
-          <p className="eyebrow">Submit → Track → Pay → Download → Proof</p>
+          <p className="eyebrow">Assignment lifecycle</p>
           <h1>Your Submission Dashboard</h1>
           <p>
-            Real-time assignment tracking, secured payments, and proof-of-work
-            downloads once your order is READY.
+            Track progress, settle payments, and download proofs without leaving
+            LanceHub.
           </p>
+          <div className="stepper">
+            {STEP_FLOW.map((step, index) => {
+              const state =
+                index < currentStepIndex
+                  ? "complete"
+                  : index === currentStepIndex
+                  ? "active"
+                  : "upcoming";
+              return (
+                <div key={step.id} className={`step ${state}`}>
+                  <span className="step-dot" />
+                  <p>{step.label}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -183,215 +287,361 @@ export default function Submission() {
       <section className="submission-page">
         <div className="container">
           <div className="submission-layout">
-            {/* SEARCH + STATUS LEGEND */}
-            <div className="search-panel">
-              <label htmlFor="assignment-search">Assignment ID search</label>
-              <input
-                id="assignment-search"
-                type="text"
-                placeholder="Search by Assignment ID (e.g. LH-2025-001)"
-                value={searchId}
-                onChange={(event) => setSearchId(event.target.value)}
-              />
-              <p className="search-hint">
-                Search always requires login + assignment ownership. Results only
-                show status, never files.
-              </p>
-              {exactMatch && (
-                <div className="search-result-card">
-                  <div>
-                    <p className="assignment-id">{exactMatch.id}</p>
-                    <p className="result-title">{exactMatch.title}</p>
-                  </div>
-                  <div className="result-meta">
-                    <span
-                      className="status-badge"
-                      style={{
-                        color: STATUS_META[exactMatch.status]?.textColor,
-                        background:
-                          STATUS_META[exactMatch.status]?.pill ||
-                          "rgba(0,0,0,0.08)",
-                      }}
-                    >
-                      {STATUS_META[exactMatch.status]?.label ?? "Unknown"}
-                    </span>
-                    <p>
-                      {STATUS_META[exactMatch.status]?.message ??
-                        "Status unavailable"}
+            <div className="sidebar">
+              <div className="summary-card">
+                {nextActionAssignment ? (
+                  <>
+                    <p className="summary-eyebrow">⚡ Next action required</p>
+                    <h3>
+                      {actionableAssignments.length} assignment
+                      {actionableAssignments.length > 1 ? "s" : ""} need payment
+                    </h3>
+                    <p className="summary-total">
+                      Total due: {formatCurrency(totalActionDue)}
                     </p>
-                  </div>
-                </div>
-              )}
-              <div className="status-legend">
-                {Object.entries(STATUS_META).map(([status, meta]) => (
-                  <div key={status} className="legend-item">
-                    <span
-                      className="status-dot"
-                      style={{ backgroundColor: meta.textColor }}
-                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() =>
+                        handleScrollToAssignment(nextActionAssignment.id)
+                      }
+                    >
+                      Pay now
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="summary-eyebrow">✅ All clear</p>
+                    <h3>All assignments are on track</h3>
+                    <p className="subtle-note">
+                      We’ll notify you as soon as a payment or download is
+                      required.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              <div className="search-panel sticky">
+                <label htmlFor="assignment-search">Assignment ID search</label>
+                <input
+                  id="assignment-search"
+                  type="text"
+                  placeholder="Search by Assignment ID (e.g. LH-2025-001)"
+                  value={searchId}
+                  onChange={(event) => setSearchId(event.target.value)}
+                />
+                <p className="search-hint">
+                  Search requires login + assignment ownership. Results only show
+                  status, never files.
+                </p>
+                {exactMatch && (
+                  <div className="search-result-card">
                     <div>
-                      <p>{meta.label}</p>
-                      <small>{meta.message}</small>
+                      <p className="assignment-id">{exactMatch.id}</p>
+                      <p className="result-title">{exactMatch.title}</p>
+                    </div>
+                    <div className="result-meta">
+                      <span
+                        className={`status-pill status-${exactMatch.status.toLowerCase()}`}
+                      >
+                        {STATUS_META[exactMatch.status]?.label ?? "Unknown"}
+                      </span>
+                      <p>
+                        {STATUS_META[exactMatch.status]?.message ??
+                          "Status unavailable"}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-              <div className="support-banner">
-                Need help?{" "}
-                <Link href="/contact" className="text-link">
-                  Talk to our support desk →
-                </Link>
+                )}
+                <div className="status-legend">
+                  {Object.entries(STATUS_META).map(([status, meta]) => (
+                    <div key={status} className="legend-item">
+                      <span
+                        className="status-dot"
+                        style={{ backgroundColor: meta.textColor }}
+                      />
+                      <div>
+                        <p>{meta.label}</p>
+                        <small>{meta.message}</small>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="support-banner">
+                  Need help?{" "}
+                  <Link href="/contact" className="text-link">
+                    Talk to our support desk →
+                  </Link>
+                </div>
               </div>
             </div>
 
             {/* ASSIGNMENT LIST */}
-            <div className="assignments-grid">
-              {filteredAssignments.map((assignment) => {
-                const meta =
-                  STATUS_META[assignment.status] ??
-                  STATUS_META.CREATED;
-                const canDownload = assignment.status === "READY";
-                const canPay = assignment.status === "DONE";
-                const canShowProof = assignment.status === "READY";
-                const noticeForAssignment =
-                  paymentNotice?.assignmentId === assignment.id
-                    ? paymentNotice
-                    : null;
+            <div className="assignments-column">
+              <div className="filter-bar">
+                <p>Filter:</p>
+                <div className="filter-buttons">
+                  {FILTER_OPTIONS.map((filter) => (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      className={`filter-chip${
+                        statusFilter === filter.id ? " active" : ""
+                      }`}
+                      onClick={() => setStatusFilter(filter.id)}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                return (
-                  <article key={assignment.id} className="assignment-card">
-                    <header className="card-header">
-                      <div>
-                        <p className="assignment-id">{assignment.id}</p>
-                        <h3>{assignment.title}</h3>
-                      </div>
-                      <span
-                        className="status-badge"
-                        style={{
-                          color: meta.textColor,
-                          background: meta.pill,
-                        }}
-                      >
-                        {meta.label}
-                      </span>
-                    </header>
+              <div className="assignments-grid">
+                {filteredAssignments.map((assignment) => {
+                  const meta =
+                    STATUS_META[assignment.status] ?? STATUS_META.CREATED;
+                  const canDownload = assignment.status === "READY";
+                  const canPay = assignment.status === "DONE";
+                  const currentMethod =
+                    selectedMethods[assignment.id] ?? "paypal";
+                  const methodIsPayPal = currentMethod === "paypal";
+                  const noticeForAssignment =
+                    paymentNotice?.assignmentId === assignment.id
+                      ? paymentNotice
+                      : null;
 
-                    <div className="card-body">
-                      <div className="card-meta">
+                  return (
+                    <article
+                      key={assignment.id}
+                      id={`assignment-${assignment.id}`}
+                      className="assignment-card"
+                    >
+                      <header className="card-header">
                         <div>
-                          <p className="meta-label">Amount Due</p>
-                          <p className="meta-value">
-                            {formatCurrency(assignment.amount)}
+                          <p className="assignment-id">
+                            🆔 {assignment.id}
                           </p>
+                          <h3>{assignment.title}</h3>
                         </div>
-                        <div>
-                          <p className="meta-label">Due</p>
-                          <p className="meta-value">{assignment.dueDate}</p>
-                        </div>
-                        <div>
-                          <p className="meta-label">Last update</p>
-                          <p className="meta-value">{assignment.updatedAt}</p>
-                        </div>
-                        <div>
-                          <p className="meta-label">Payment method</p>
-                          <p className="meta-value">
-                            {PAYMENT_METHOD_ICON[assignment.paymentMethod] ??
-                              "💼"}{" "}
-                            {assignment.paymentMethod?.toUpperCase()}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="status-message">{meta.message}</p>
-                      {assignment.status === "PAYMENT_PENDING" && (
-                        <p className="subtle-note">
-                          Finance review SLA: &lt; 20 minutes. You will get an
-                          email once READY.
-                        </p>
-                      )}
-                    </div>
+                        <span
+                          className={`status-pill status-${assignment.status.toLowerCase()}`}
+                        >
+                          {meta.label}
+                        </span>
+                      </header>
 
-                    <div className="action-row">
-                      <div className="download-stack">
-                        <p>Download Center</p>
-                        <div className="download-buttons">
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            disabled={!canDownload}
-                            onClick={() =>
-                              canDownload &&
-                              handleDownload(assignment.id, "Assignment file")
-                            }
-                          >
-                            {canDownload
-                              ? "Download Assignment"
-                              : "Download locked"}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            disabled={!canShowProof}
-                            onClick={() =>
-                              canShowProof &&
-                              handleDownload(assignment.id, "Proof of payment")
-                            }
-                          >
-                            {canShowProof
-                              ? "Download Proof (PDF)"
-                              : "Proof available after approval"}
-                          </button>
-                        </div>
+                      <div className="card-body">
+                        <ul className="meta-list">
+                          <li>
+                            <span>💰 Amount</span>
+                            <strong>
+                              {formatCurrency(assignment.amount)}
+                            </strong>
+                          </li>
+                          <li>
+                            <span>📅 Due</span>
+                            <strong>{assignment.dueDate}</strong>
+                          </li>
+                          <li>
+                            <span>🕒 Last update</span>
+                            <strong>{assignment.updatedAt}</strong>
+                          </li>
+                          <li>
+                            <span>💳 Payment</span>
+                            <strong>
+                              {PAYMENT_METHOD_ICON[assignment.paymentMethod] ??
+                                "💼"}{" "}
+                              {assignment.paymentMethod?.toUpperCase()}
+                            </strong>
+                          </li>
+                        </ul>
+                        <p className="status-message">{meta.message}</p>
+                        {assignment.status === "PAYMENT_PENDING" && (
+                          <div className="info-stack neutral">
+                            <p className="info-title">
+                              ⏳ Finance review in progress
+                            </p>
+                            <p className="subtle-note">
+                              Average approval time: under 20 minutes. We’ll
+                              email you once downloads unlock.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
-                      {canPay && (
-                        <div className="payment-stack">
-                          <p>Secure payment</p>
-                          <p className="subtle-note">
-                            PayPal sandbox enabled for MVP. Amount auto-fills
-                            from the assignment card.
-                          </p>
-                          {payPalClientConfigured ? (
-                            <PayPalButtons
-                              style={{ layout: "horizontal", color: "gold" }}
-                              disabled={paypalLoadingId === assignment.id}
-                              createOrder={(data, actions) => {
-                                setPaypalLoadingId(assignment.id);
-                                return actions.order.create({
-                                  purchase_units: [
-                                    {
-                                      amount: {
-                                        value: assignment.amount.toFixed(2),
-                                      },
-                                      description: assignment.title,
-                                      custom_id: assignment.id,
-                                    },
-                                  ],
-                                });
-                              }}
-                              onApprove={async (data, actions) => {
-                                const order = await actions.order.capture();
-                                handlePaymentSuccess(order.id, assignment.id);
-                              }}
-                              onCancel={() => handlePaymentError(assignment.id)}
-                              onError={() => handlePaymentError(assignment.id)}
-                            />
-                          ) : (
-                            <div className="notice warning">
-                              Add NEXT_PUBLIC_PAYPAL_CLIENT_ID to enable
-                              checkout.
+                      <div className="cta-row">
+                        {canPay && (
+                          <div className="payment-stack">
+                            <div className="payment-select-wrapper">
+                              <label htmlFor={`quick-select-${assignment.id}`}>
+                                Select payment method
+                              </label>
+                              <div className="select-wrapper">
+                                <span className="select-icon">
+                                  {PAYMENT_METHOD_ICON[currentMethod] ?? "💼"}
+                                </span>
+                                <select
+                                  id={`quick-select-${assignment.id}`}
+                                  value={currentMethod}
+                                  onChange={(event) =>
+                                    handlePaymentMethodChange(
+                                      assignment.id,
+                                      event.target.value
+                                    )
+                                  }
+                                >
+                                  {PAYMENT_OPTIONS.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label}
+                                      {!option.enabled ? " — contact support" : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      )}
 
-                      {!canPay && !canDownload && (
-                        <div className="info-stack">
-                          <p className="subtle-note">
-                            Payments unlock automatically once the writer marks
-                            the assignment as DONE.
-                          </p>
-                        </div>
-                      )}
+                            {currentMethod && (
+                              <>
+                                <div className="payment-grid">
+                                  <div className="payment-methods-section">
+                                    <p className="section-title">How would you like to pay?</p>
+                                    <div className="payment-methods-list">
+                                      {PAYMENT_OPTIONS.map((option) => (
+                                        <label
+                                          key={option.id}
+                                          className="payment-option"
+                                        >
+                                          <input
+                                            type="radio"
+                                            name={`payment-${assignment.id}`}
+                                            value={option.id}
+                                            checked={currentMethod === option.id}
+                                            onChange={(event) =>
+                                              handlePaymentMethodChange(
+                                                assignment.id,
+                                                event.target.value
+                                              )
+                                            }
+                                            disabled={!option.enabled}
+                                          />
+                                          <span className="radio-custom" />
+                                          <span className="method-label">
+                                            {option.label}
+                                          </span>
+                                          <span className="method-icon">
+                                            {PAYMENT_METHOD_ICON[option.id] ??
+                                              "💼"}
+                                          </span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="order-summary-section">
+                                    <p className="section-title">Order Summary</p>
+                                    <div className="summary-item">
+                                      <span>{assignment.title}</span>
+                                      <span className="amount">
+                                        {formatCurrency(assignment.amount)}
+                                      </span>
+                                    </div>
+                                    <div className="summary-divider" />
+                                    <div className="summary-total">
+                                      <span>Total</span>
+                                      <span className="total-amount">
+                                        {formatCurrency(assignment.amount)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {payPalClientConfigured ? (
+                                  methodIsPayPal ? (
+                                    <div className="paypal-buttons-wrapper">
+                                      <PayPalButtons
+                                        style={{ layout: "horizontal", color: "gold" }}
+                                        disabled={paypalLoadingId === assignment.id}
+                                        createOrder={(data, actions) => {
+                                          setPaypalLoadingId(assignment.id);
+                                          return actions.order.create({
+                                            purchase_units: [
+                                              {
+                                                amount: {
+                                                  value: assignment.amount.toFixed(2),
+                                                },
+                                                description: assignment.title,
+                                                custom_id: assignment.id,
+                                              },
+                                            ],
+                                          });
+                                        }}
+                                        onApprove={async (data, actions) => {
+                                          const order = await actions.order.capture();
+                                          handlePaymentSuccess(
+                                            order.id,
+                                            assignment.id
+                                          );
+                                        }}
+                                        onCancel={() =>
+                                          handlePaymentError(assignment.id)
+                                        }
+                                        onError={() =>
+                                          handlePaymentError(assignment.id)
+                                        }
+                                      />
+                                    </div>
+                                  ) : null
+                                ) : (
+                                  <div className="notice warning">
+                                    Payment temporarily unavailable. Please contact
+                                    support.
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {canDownload ? (
+                          <div className="download-stack ready">
+                            <p className="stack-title">Download center</p>
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              onClick={() =>
+                                handleDownload(
+                                  assignment.id,
+                                  "Assignment file"
+                                )
+                              }
+                            >
+                              ⬇ Download assignment
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              onClick={() =>
+                                handleDownload(
+                                  assignment.id,
+                                  "Proof of payment"
+                                )
+                              }
+                            >
+                              ⬇ Download proof (PDF)
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="info-stack locked">
+                            <p className="info-title">
+                              🔒 Downloads locked
+                            </p>
+                            <p className="subtle-note">
+                              Downloads unlock automatically once payment is
+                              approved and status becomes READY.
+                            </p>
+                          </div>
+                        )}
+                      </div>
 
                       {noticeForAssignment && (
                         <div className="notice success">
@@ -401,17 +651,20 @@ export default function Submission() {
                           )}
                         </div>
                       )}
-                    </div>
-                  </article>
-                );
-              })}
+                    </article>
+                  );
+                })}
 
-              {filteredAssignments.length === 0 && (
-                <p className="empty-state">
-                  No assignment found with that ID. Verify the code from your
-                  email receipt.
-                </p>
-              )}
+                {filteredAssignments.length === 0 && (
+                  <div className="empty-state">
+                    <p>No assignment found with that criteria.</p>
+                    <p className="subtle-note">
+                      Double-check the ID from your confirmation email or reset
+                      the filters above.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
