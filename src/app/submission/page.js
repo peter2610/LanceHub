@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { PayPalButtons } from "@paypal/react-paypal-js";
 
 const STATUS_META = {
   CREATED: {
@@ -84,9 +83,6 @@ const formatCurrency = (value) =>
 export default function Submission() {
   const [searchId, setSearchId] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [paymentNotice, setPaymentNotice] = useState(null);
-  const [paypalLoadingId, setPaypalLoadingId] = useState(null);
-  const [selectedMethods, setSelectedMethods] = useState({});
   const [toast, setToast] = useState(null);
 
   const initialAssignments = useMemo(
@@ -198,10 +194,6 @@ export default function Submission() {
       assignment.id.toLowerCase() === searchId.trim().toLowerCase()
   );
 
-  const payPalClientConfigured = Boolean(
-    process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
-  );
-
   const handleScrollToAssignment = useCallback((assignmentId) => {
     const el = document.getElementById(`assignment-${assignmentId}`);
     if (el) {
@@ -209,43 +201,8 @@ export default function Submission() {
     }
   }, []);
 
-  const handlePaymentSuccess = (orderId, assignmentId) => {
-    setAssignments((prev) =>
-      prev.map((assignment) =>
-        assignment.id === assignmentId
-          ? { ...assignment, status: "PAYMENT_PENDING", orderId }
-          : assignment
-      )
-    );
-    setPaymentNotice({
-      assignmentId,
-      orderId,
-      text: "Payment captured. Finance will approve shortly.",
-    });
-    setPaypalLoadingId(null);
-  };
-
-  const handlePaymentError = (assignmentId) => {
-    setPaymentNotice({
-      assignmentId,
-      text: "Payment failed or was cancelled. Please try again.",
-    });
-    setPaypalLoadingId(null);
-  };
-
   const handleDownload = (assignmentId, type) => {
     alert(`${type} download unlocked for ${assignmentId} (mock action).`);
-  };
-
-  const handlePaymentMethodChange = (assignmentId, methodId) => {
-    setSelectedMethods((prev) => ({ ...prev, [assignmentId]: methodId }));
-    if (methodId !== "paypal") {
-      setToast({
-        type: "warning",
-        text: `Only PayPal is available for online checkout. Please choose PayPal or contact support to use ${methodId.toUpperCase()}.`,
-      });
-      setTimeout(() => setToast(null), 4000);
-    }
   };
 
   return (
@@ -402,13 +359,6 @@ export default function Submission() {
                     STATUS_META[assignment.status] ?? STATUS_META.CREATED;
                   const canDownload = assignment.status === "READY";
                   const canPay = assignment.status === "DONE";
-                  const currentMethod =
-                    selectedMethods[assignment.id] ?? "paypal";
-                  const methodIsPayPal = currentMethod === "paypal";
-                  const noticeForAssignment =
-                    paymentNotice?.assignmentId === assignment.id
-                      ? paymentNotice
-                      : null;
 
                   return (
                     <article
@@ -501,103 +451,9 @@ export default function Submission() {
                             </div>
 
                             {currentMethod && (
-                              <>
-                                <div className="payment-grid">
-                                  <div className="payment-methods-section">
-                                    <p className="section-title">How would you like to pay?</p>
-                                    <div className="payment-methods-list">
-                                      {PAYMENT_OPTIONS.map((option) => (
-                                        <label
-                                          key={option.id}
-                                          className="payment-option"
-                                        >
-                                          <input
-                                            type="radio"
-                                            name={`payment-${assignment.id}`}
-                                            value={option.id}
-                                            checked={currentMethod === option.id}
-                                            onChange={(event) =>
-                                              handlePaymentMethodChange(
-                                                assignment.id,
-                                                event.target.value
-                                              )
-                                            }
-                                            disabled={!option.enabled}
-                                          />
-                                          <span className="radio-custom" />
-                                          <span className="method-label">
-                                            {option.label}
-                                          </span>
-                                          <span className="method-icon">
-                                            {PAYMENT_METHOD_ICON[option.id] ??
-                                              "💼"}
-                                          </span>
-                                        </label>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  <div className="order-summary-section">
-                                    <p className="section-title">Order Summary</p>
-                                    <div className="summary-item">
-                                      <span>{assignment.title}</span>
-                                      <span className="amount">
-                                        {formatCurrency(assignment.amount)}
-                                      </span>
-                                    </div>
-                                    <div className="summary-divider" />
-                                    <div className="summary-total">
-                                      <span>Total</span>
-                                      <span className="total-amount">
-                                        {formatCurrency(assignment.amount)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {payPalClientConfigured ? (
-                                  methodIsPayPal ? (
-                                    <div className="paypal-buttons-wrapper">
-                                      <PayPalButtons
-                                        style={{ layout: "horizontal", color: "gold" }}
-                                        disabled={paypalLoadingId === assignment.id}
-                                        createOrder={(data, actions) => {
-                                          setPaypalLoadingId(assignment.id);
-                                          return actions.order.create({
-                                            purchase_units: [
-                                              {
-                                                amount: {
-                                                  value: assignment.amount.toFixed(2),
-                                                },
-                                                description: assignment.title,
-                                                custom_id: assignment.id,
-                                              },
-                                            ],
-                                          });
-                                        }}
-                                        onApprove={async (data, actions) => {
-                                          const order = await actions.order.capture();
-                                          handlePaymentSuccess(
-                                            order.id,
-                                            assignment.id
-                                          );
-                                        }}
-                                        onCancel={() =>
-                                          handlePaymentError(assignment.id)
-                                        }
-                                        onError={() =>
-                                          handlePaymentError(assignment.id)
-                                        }
-                                      />
-                                    </div>
-                                  ) : null
-                                ) : (
-                                  <div className="notice warning">
-                                    Payment temporarily unavailable. Please contact
-                                    support.
-                                  </div>
-                                )}
-                              </>
+                              <div className="payment-notice">
+                                <p className="notice-text">Payment processing will be available once the assignment is ready for payment.</p>
+                              </div>
                             )}
                           </div>
                         )}
@@ -643,14 +499,6 @@ export default function Submission() {
                         )}
                       </div>
 
-                      {noticeForAssignment && (
-                        <div className="notice success">
-                          {noticeForAssignment.text}
-                          {noticeForAssignment.orderId && (
-                            <span> Ref: {noticeForAssignment.orderId}</span>
-                          )}
-                        </div>
-                      )}
                     </article>
                   );
                 })}
