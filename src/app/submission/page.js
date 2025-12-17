@@ -364,7 +364,7 @@ export default function Submission() {
                     <article
                       key={assignment.id}
                       id={`assignment-${assignment.id}`}
-                      className="assignment-card"
+                      className="service-card"
                     >
                       <header className="card-header">
                         <div>
