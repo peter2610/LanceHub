@@ -12,7 +12,7 @@ export default function Home() {
             <Link href="/services">Services</Link>
             <Link href="/about">About</Link>
             <Link href="/contact">Contact</Link>
-            <Link href="/submissions">Submissions</Link>
+            <Link href="/submission">Submissions</Link>
             <Link href="/submit" className="btn btn-primary" style={{margin: 0}}>Submit</Link>
           </div>
         </div>
@@ -66,7 +66,7 @@ export default function Home() {
           <Link href="/services">Services</Link>
           <Link href="/about">About</Link>
           <Link href="/contact">Contact</Link>
-          <Link href="/submissions">submissions</Link>
+          <Link href="/submission">Submissions</Link>
         </div>
       </footer>
     </div>
