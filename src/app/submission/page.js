@@ -206,280 +206,108 @@ export default function Submission() {
   };
 
   return (
-    <div className="submission-shell">
+    <div className="checkout-container">
       {toast && (
         <div className={`toast toast-${toast.type}`}>
           <p>{toast.text}</p>
         </div>
       )}
-      {/* HERO */}
-      <section className="hero-section submission-hero">
-        <div className="container">
-          <p className="eyebrow">Assignment lifecycle</p>
-          <h1>Your Submission Dashboard</h1>
-          <p>
-            Track progress, settle payments, and download proofs without leaving
-            LanceHub.
-          </p>
-          <div className="stepper">
-            {STEP_FLOW.map((step, index) => {
-              const state =
-                index < currentStepIndex
-                  ? "complete"
-                  : index === currentStepIndex
-                  ? "active"
-                  : "upcoming";
-              return (
-                <div key={step.id} className={`step ${state}`}>
-                  <span className="step-dot" />
-                  <p>{step.label}</p>
-                </div>
-              );
-            })}
+      
+      {/* Progress Bar */}
+      <div className="checkout-progress">
+        {['Order', 'Shipping', 'Payment', 'Review'].map((step, index) => (
+          <div key={step} className={`progress-step ${index === 2 ? 'active' : index < 2 ? 'completed' : ''}`}>
+            <div className="step-number">{index < 2 ? '✓' : index + 1}</div>
+            <div className="step-label">{step}</div>
           </div>
-        </div>
-      </section>
+        ))}
+      </div>
 
-      {/* CONTENT */}
-      <section className="submission-page">
-        <div className="container">
-          <div className="submission-layout">
-            <div className="sidebar">
-              <div className="summary-card">
-                {nextActionAssignment ? (
-                  <>
-                    <p className="summary-eyebrow">⚡ Next action required</p>
-                    <h3>
-                      {actionableAssignments.length} assignment
-                      {actionableAssignments.length > 1 ? "s" : ""} need payment
-                    </h3>
-                    <p className="summary-total">
-                      Total due: {formatCurrency(totalActionDue)}
-                    </p>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() =>
-                        handleScrollToAssignment(nextActionAssignment.id)
-                      }
-                    >
-                      Pay now
-                    </button>
-                  </>
+      {/* Items Section */}
+      <div className="items-section">
+        <h2>Items</h2>
+        {filteredAssignments.map((assignment) => {
+          const meta = STATUS_META[assignment.status] ?? STATUS_META.CREATED;
+          const canPay = assignment.status === "DONE";
+          const isPaid = ["PAID", "READY"].includes(assignment.status);
+          
+          return (
+            <div key={assignment.id} className="item-card">
+              <div className="item-image">📄</div>
+              <div className="item-details">
+                <div className="item-title">{assignment.title}</div>
+                <div className="item-description">{meta.message}</div>
+                <div className="item-meta">
+                  <span>ID: {assignment.id}</span>
+                  <span>Due: {assignment.dueDate}</span>
+                  <span>Payment: {assignment.paymentMethod?.toUpperCase()}</span>
+                </div>
+              </div>
+              <div className="item-price">{formatCurrency(assignment.amount)}</div>
+              <div className="item-actions">
+                <div className="quantity-control">
+                  <button className="quantity-btn">-</button>
+                  <span className="quantity-value">1</span>
+                  <button className="quantity-btn">+</button>
+                </div>
+                {canPay ? (
+                  <button className="pay-item-btn">
+                    Pay with PayPal
+                  </button>
+                ) : isPaid ? (
+                  <button className="pay-item-btn" disabled>
+                    Paid
+                  </button>
                 ) : (
-                  <>
-                    <p className="summary-eyebrow">✅ All clear</p>
-                    <h3>All assignments are on track</h3>
-                    <p className="subtle-note">
-                      We’ll notify you as soon as a payment or download is
-                      required.
-                    </p>
-                  </>
-                )}
-              </div>
-
-              <div className="search-panel sticky">
-                <label htmlFor="assignment-search">Assignment ID search</label>
-                <input
-                  id="assignment-search"
-                  type="text"
-                  placeholder="Search by Assignment ID (e.g. LH-2025-001)"
-                  value={searchId}
-                  onChange={(event) => setSearchId(event.target.value)}
-                />
-                <p className="search-hint">
-                  Search requires login + assignment ownership. Results only show
-                  status, never files.
-                </p>
-                {exactMatch && (
-                  <div className="search-result-card">
-                    <div>
-                      <p className="assignment-id">{exactMatch.id}</p>
-                      <p className="result-title">{exactMatch.title}</p>
-                    </div>
-                    <div className="result-meta">
-                      <span
-                        className={`status-pill status-${exactMatch.status.toLowerCase()}`}
-                      >
-                        {STATUS_META[exactMatch.status]?.label ?? "Unknown"}
-                      </span>
-                      <p>
-                        {STATUS_META[exactMatch.status]?.message ??
-                          "Status unavailable"}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <div className="status-legend">
-                  {Object.entries(STATUS_META).map(([status, meta]) => (
-                    <div key={status} className="legend-item">
-                      <span
-                        className="status-dot"
-                        style={{ backgroundColor: meta.textColor }}
-                      />
-                      <div>
-                        <p>{meta.label}</p>
-                        <small>{meta.message}</small>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="support-banner">
-                  Need help?{" "}
-                  <Link href="/contact" className="text-link">
-                    Talk to our support desk →
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            {/* ASSIGNMENT LIST */}
-            <div className="assignments-column">
-              <div className="filter-bar">
-                <p>Filter:</p>
-                <div className="filter-buttons">
-                  {FILTER_OPTIONS.map((filter) => (
-                    <button
-                      key={filter.id}
-                      type="button"
-                      className={`filter-chip${
-                        statusFilter === filter.id ? " active" : ""
-                      }`}
-                      onClick={() => setStatusFilter(filter.id)}
-                    >
-                      {filter.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="assignments-grid">
-                {filteredAssignments.map((assignment) => {
-                  const meta =
-                    STATUS_META[assignment.status] ?? STATUS_META.CREATED;
-                  const canDownload = assignment.status === "READY";
-                  const canPay = assignment.status === "DONE";
-
-                  return (
-                    <article
-                      key={assignment.id}
-                      id={`assignment-${assignment.id}`}
-                      className="service-card"
-                    >
-                      <header className="card-header">
-                        <div>
-                          <p className="assignment-id">
-                            🆔 {assignment.id}
-                          </p>
-                          <h3>{assignment.title}</h3>
-                        </div>
-                        <span
-                          className={`status-pill status-${assignment.status.toLowerCase()}`}
-                        >
-                          {meta.label}
-                        </span>
-                      </header>
-
-                      <div className="card-body">
-                        <ul className="meta-list">
-                          <li>
-                            <span>💰 Amount</span>
-                            <strong>
-                              {formatCurrency(assignment.amount)}
-                            </strong>
-                          </li>
-                          <li>
-                            <span>📅 Due</span>
-                            <strong>{assignment.dueDate}</strong>
-                          </li>
-                          <li>
-                            <span>🕒 Last update</span>
-                            <strong>{assignment.updatedAt}</strong>
-                          </li>
-                          <li>
-                            <span>💳 Payment</span>
-                            <strong>
-                              {PAYMENT_METHOD_ICON[assignment.paymentMethod] ??
-                                "💼"}{" "}
-                              {assignment.paymentMethod?.toUpperCase()}
-                            </strong>
-                          </li>
-                        </ul>
-                        <p className="status-message">{meta.message}</p>
-                        {assignment.status === "PAYMENT_PENDING" && (
-                          <div className="info-stack neutral">
-                            <p className="info-title">
-                              ⏳ Finance review in progress
-                            </p>
-                            <p className="subtle-note">
-                              Average approval time: under 20 minutes. We’ll
-                              email you once downloads unlock.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="cta-row">
-
-                        {canDownload ? (
-                          <div className="download-stack ready">
-                            <p className="stack-title">Download center</p>
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              onClick={() =>
-                                handleDownload(
-                                  assignment.id,
-                                  "Assignment file"
-                                )
-                              }
-                            >
-                              ⬇ Download assignment
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-outline"
-                              onClick={() =>
-                                handleDownload(
-                                  assignment.id,
-                                  "Proof of payment"
-                                )
-                              }
-                            >
-                              ⬇ Download proof (PDF)
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="info-stack locked">
-                            <p className="info-title">
-                              🔒 Downloads locked
-                            </p>
-                            <p className="subtle-note">
-                              Downloads unlock automatically once payment is
-                              approved and status becomes READY.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                    </article>
-                  );
-                })}
-
-                {filteredAssignments.length === 0 && (
-                  <div className="empty-state">
-                    <p>No assignment found with that criteria.</p>
-                    <p className="subtle-note">
-                      Double-check the ID from your confirmation email or reset
-                      the filters above.
-                    </p>
-                  </div>
+                  <button className="pay-item-btn" disabled>
+                    {meta.label}
+                  </button>
                 )}
               </div>
             </div>
+          );
+        })}
+      </div>
+
+      {/* Order Summary */}
+      <div>
+        <div className="order-summary">
+          <h3>Order summary</h3>
+          <div className="summary-row">
+            <span className="summary-label">Subtotal</span>
+            <span className="summary-value">{formatCurrency(
+              filteredAssignments.reduce((sum, assignment) => sum + assignment.amount, 0)
+            )}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Discount</span>
+            <span className="summary-value">-$0.00</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Shipping</span>
+            <span className="summary-value">Free</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Total</span>
+            <span className="summary-value">{formatCurrency(
+              filteredAssignments.reduce((sum, assignment) => sum + assignment.amount, 0)
+            )}</span>
           </div>
         </div>
-      </section>
+
+        {/* Checkout Section */}
+        <div className="checkout-section">
+          <h3>Checkout</h3>
+          <div className="payment-methods">
+            <div className="payment-method active">PayPal</div>
+            <div className="payment-method disabled">Mastercard</div>
+            <div className="payment-method disabled">Visa</div>
+          </div>
+          <button className="pay-now-btn">
+            Pay now
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
