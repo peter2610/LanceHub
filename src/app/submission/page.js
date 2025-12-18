@@ -206,7 +206,7 @@ export default function Submission() {
   };
 
   return (
-    <div className="checkout-container">
+    <div className="submission-container">
       {toast && (
         <div className={`toast toast-${toast.type}`}>
           <p>{toast.text}</p>
