@@ -1,19 +1,35 @@
+'use client';
+
 import { Roboto_Flex } from 'next/font/google';
 import Link from 'next/link';
+import { useMockAuth } from '@/context/MockAuthContext';
 
 export default function Home() {
+  const { isAuthenticated, user, logout } = useMockAuth();
   return (
     <div>
       <nav>
         <div className="container">
           <div style={{fontSize: '1.5rem', fontWeight: '700', color: '#0066ff'}}>LanceHub</div>
-          <div style={{display: 'flex', gap: '2rem'}}>
+          <div style={{display: 'flex', gap: '2rem', alignItems: 'center'}}>
             <Link href="/">Home</Link>
             <Link href="/services">Services</Link>
             <Link href="/about">About</Link>
             <Link href="/contact">Contact</Link>
-            <Link href="/submission">Submissions</Link>
-            <Link href="/submit" className="btn btn-primary" style={{margin: 0}}>Submit</Link>
+            <Link href="/submission">Submission</Link>
+            {isAuthenticated ? (
+              <>
+                <span style={{color: '#666'}}>Welcome, {user?.name}</span>
+                <button 
+                  onClick={() => logout()}
+                  style={{background: 'none', border: 'none', color: '#0066ff', cursor: 'pointer'}}
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link href="/auth/login" style={{color: '#0066ff', textDecoration: 'none'}}>Login</Link>
+            )}
           </div>
         </div>
       </nav>
@@ -52,7 +68,9 @@ export default function Home() {
         <div className="container">
           <h2>Ready to get started?</h2>
           <p>Submit your assignment today and receive high-quality work from our expert writers.</p>
-          <Link href="/submit" className="btn btn-primary">Get Started Now</Link>
+          <Link href={isAuthenticated ? "/submission" : "/auth/register"} className="btn btn-primary">
+            {isAuthenticated ? "Submit Assignment" : "Get Started Now"}
+          </Link>
         </div>
       </section>
 
@@ -66,7 +84,7 @@ export default function Home() {
           <Link href="/services">Services</Link>
           <Link href="/about">About</Link>
           <Link href="/contact">Contact</Link>
-          <Link href="/submission">Submissions</Link>
+          <Link href="/submission">Submission</Link>
         </div>
       </footer>
     </div>
