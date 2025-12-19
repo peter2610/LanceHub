@@ -1,4 +1,29 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useMockAuth } from '@/context/MockAuthContext';
+import LoadingSpinner from '@/components/layout/LoadingSpinner';
+
 export default function Submit() {
+  const { isAuthenticated } = useMockAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const callbackUrl = searchParams.get('callbackUrl') || '/submit';
+      router.push(`/auth/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+    } else {
+      setLoading(false);
+    }
+  }, [isAuthenticated, router, searchParams]);
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
   return (
     <div>
       <section className="hero-section">
