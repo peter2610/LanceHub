@@ -65,19 +65,6 @@ export default function Submission() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [toast, setToast] = useState(null);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      const callbackUrl = searchParams.get('callbackUrl') || '/submission';
-      router.push(`/auth/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-    } else {
-      setLoading(false);
-    }
-  }, [isAuthenticated, router, searchParams]);
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
   const assignments = useMemo(
     () => [
       {
@@ -154,6 +141,19 @@ export default function Submission() {
     });
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const callbackUrl = searchParams.get('callbackUrl') || '/submission';
+      router.push(`/auth/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+    } else {
+      setLoading(false);
+    }
+  }, [isAuthenticated, router, searchParams]);
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="submission-container">

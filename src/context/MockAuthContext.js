@@ -21,7 +21,7 @@ export function MockAuthProvider({ children }) {
     try {
       console.log('Login attempt with:', credentials); // Debug log
       
-      // Mock authentication
+      // Check for hardcoded test users first
       if (credentials.email === 'user@example.com' && credentials.password === 'password') {
         const userData = {
           id: '1',
@@ -31,7 +31,7 @@ export function MockAuthProvider({ children }) {
         };
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
-        console.log('Login successful for user'); // Debug log
+        console.log('Login successful for test user'); // Debug log
         return { success: true };
       }
       if (credentials.email === 'writer@example.com' && credentials.password === 'password') {
@@ -43,27 +43,46 @@ export function MockAuthProvider({ children }) {
         };
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
-        console.log('Login successful for writer'); // Debug log
+        console.log('Login successful for test writer'); // Debug log
         return { success: true };
       }
       if (credentials.email === 'admin@example.com' && credentials.password === 'password') {
         const userData = {
           id: '3',
           email: 'admin@example.com',
-          name: 'Admin User',
+          name: 'Test Admin',
           role: 'ADMIN'
         };
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
-        console.log('Login successful for admin'); // Debug log
+        console.log('Login successful for test admin'); // Debug log
         return { success: true };
       }
       
-      console.log('Login failed - invalid credentials'); // Debug log
+      // Check for registered users in localStorage
+      const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+      const registeredUser = registeredUsers.find(u => 
+        u.email === credentials.email && u.password === credentials.password
+      );
+      
+      if (registeredUser) {
+        const userData = {
+          id: registeredUser.id,
+          email: registeredUser.email,
+          name: registeredUser.name,
+          role: registeredUser.role || 'USER'
+        };
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        console.log('Login successful for registered user'); // Debug log
+        return { success: true };
+      }
+      
+      console.log('Login failed: invalid credentials'); // Debug log
       return { error: 'Invalid credentials' };
     } catch (error) {
-      console.log('Login error:', error); // Debug log
-      return { error: 'Login failed' };
+      console.error('Login error:', error); // Debug log
+      return { error: 'An error occurred during login' };
     } finally {
       setLoading(false);
     }
