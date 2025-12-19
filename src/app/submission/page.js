@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMockAuth } from "@/context/MockAuthContext";
+import LoadingSpinner from "@/components/layout/LoadingSpinner";
 
 const STATUS_META = {
   CREATED: {
@@ -54,9 +57,26 @@ const formatCurrency = (value) => {
 };
 
 export default function Submission() {
+  const { isAuthenticated } = useMockAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const callbackUrl = searchParams.get('callbackUrl') || '/submission';
+      router.push(`/auth/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+    } else {
+      setLoading(false);
+    }
+  }, [isAuthenticated, router, searchParams]);
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   const assignments = useMemo(
     () => [
