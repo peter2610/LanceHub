@@ -17,18 +17,6 @@
   --accent: #ff6b6b;
 }
 
-/* Dark mode variables */
-.dark {
-  --primary: #3b82f6;
-  --primary-dark: #2563eb;
-  --secondary: #1f2937;
-  --text-primary: #f9fafb;
-  --text-secondary: #d1d5db;
-  --border: #374151;
-  --background: #111827;
-  --accent: #ef4444;
-}
-
 html, body {
   margin: 0;
   padding: 0;
@@ -36,11 +24,13 @@ html, body {
   background: #ffffff;
   color: var(--text-primary);
   line-height: 1.6;
+  width: 100%;
+  min-height: 100vh;
 }
 
-/* Table styles now handled by Tailwind CSS in components */
+/* Navigation */
 nav {
-  background: #ffffff;
+  background: var(--background);
   border-bottom: 1px solid var(--border);
   padding: 1rem 0;
   position: sticky;

@@ -1,8 +1,10 @@
 import { Inter } from "next/font/google";
-import "./globals.css";
-import { PayPalProvider } from "../components/PayPalProvider";
-import { MockAuthProvider } from "../context/MockAuthContext";
-import HomepageNavigation from "../components/layout/HomepageNavigation";
+import "../modules/core/styles/globals.css";
+import { PayPalProvider } from "../modules/shared/providers/PayPalProvider";
+import { MockAuthProvider } from "../modules/shared/providers/MockAuthContext";
+import { ThemeProvider } from "../modules/shared/providers/ThemeContext";
+import { AssignmentProvider } from "../modules/shared/providers/AssignmentContext";
+import HomepageNavigation from "../modules/core/layout/HomepageNavigation";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -19,12 +21,16 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={inter.variable}>
       <body className={inter.className}>
-        <MockAuthProvider>
-          <HomepageNavigation />
-          <main>
-            <PayPalProvider>{children}</PayPalProvider>
-          </main>
-        </MockAuthProvider>
+        <ThemeProvider>
+          <MockAuthProvider>
+            <AssignmentProvider>
+              <HomepageNavigation />
+              <main className="bg-white min-h-screen">
+                <PayPalProvider>{children}</PayPalProvider>
+              </main>
+            </AssignmentProvider>
+          </MockAuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

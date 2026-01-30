@@ -2,8 +2,9 @@
 
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMockAuth } from "@/context/MockAuthContext";
-import LoadingSpinner from "@/components/layout/LoadingSpinner";
+import { useMockAuth } from "@/modules/shared/providers/MockAuthContext";
+import RoleBasedRoute from "@/modules/shared/components/RoleBasedRoute";
+import LoadingSpinner from "@/modules/shared/components/LoadingSpinner";
 
 const STATUS_META = {
   CREATED: {
@@ -57,6 +58,14 @@ const formatCurrency = (value) => {
 };
 
 export default function Submission() {
+  return (
+    <RoleBasedRoute requiredRole="CLIENT">
+      <SubmissionContent />
+    </RoleBasedRoute>
+  );
+}
+
+function SubmissionContent() {
   const { isAuthenticated } = useMockAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,6 +73,9 @@ export default function Submission() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [toast, setToast] = useState(null);
+  const [upholdAssignment, setUpholdAssignment] = useState(null);
+  const [upholdFile, setUpholdFile] = useState(null);
+  const [upholdDescription, setUpholdDescription] = useState("");
 
   const assignments = useMemo(
     () => [
@@ -141,6 +153,34 @@ export default function Submission() {
     });
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  const handleUpholdAssignment = useCallback((assignment) => {
+    setUpholdAssignment(assignment);
+    setUpholdFile(null);
+    setUpholdDescription("");
+  }, []);
+
+  const handleUpholdSubmit = useCallback(() => {
+    if (!upholdFile) {
+      setToast({
+        type: "error",
+        message: "Please select a file to upload",
+      });
+      return;
+    }
+
+    setToast({
+      type: "success",
+      message: `Upholding assignment ${upholdAssignment.id}...`,
+    });
+
+    // Reset form
+    setUpholdAssignment(null);
+    setUpholdFile(null);
+    setUpholdDescription("");
+    
+    setTimeout(() => setToast(null), 3000);
+  }, [upholdAssignment, upholdFile]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -260,6 +300,13 @@ export default function Submission() {
                         </button>
                       )}
                     </>
+                  ) : assignment.status === "ON_PROGRESS" ? (
+                    <button
+                      onClick={() => handleUpholdAssignment(assignment)}
+                      className="btn btn-outline"
+                    >
+                      📤 Uphold Assignment
+                    </button>
                   ) : (
                     <button className="btn btn-disabled" disabled>
                       {meta.label}
@@ -273,8 +320,77 @@ export default function Submission() {
       )}
 
       {toast && (
-        <div className={`toast ${toast.type === "success" ? "bg-green-500" : "bg-blue-500"}`}>
+        <div className={`toast ${
+          toast.type === "success" ? "bg-green-600" : 
+          toast.type === "error" ? "bg-red-600" : 
+          "bg-blue-600"
+        }`}>
           {toast.message}
+        </div>
+      )}
+
+      {/* Uphold Assignment Modal */}
+      {upholdAssignment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Uphold Assignment</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 mb-2">
+                  Assignment: <span className="font-medium">{upholdAssignment.id}</span>
+                </p>
+                <p className="text-sm text-gray-600 mb-2">
+                  Title: <span className="font-medium">{upholdAssignment.title}</span>
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload File/Document
+                </label>
+                <input
+                  type="file"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  accept=".pdf,.doc,.docx,.txt"
+                  onChange={(e) => setUpholdFile(e.target.files[0])}
+                />
+                {upholdFile && (
+                  <p className="text-sm text-green-600 mt-1">
+                    Selected: {upholdFile.name}
+                  </p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={4}
+                  placeholder="Add any additional information about this uphold..."
+                  value={upholdDescription}
+                  onChange={(e) => setUpholdDescription(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setUpholdAssignment(null)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpholdSubmit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Submit Uphold
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
